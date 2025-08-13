@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>스푼랩스 랜덤런치 신청</title>
+
+  <style>
+    body { visibility: hidden; }
+
+    @font-face {
+      font-family: 'DungGeunMo';
+      src: url('./DungGeunMo.woff2') format('woff2'),
+           url('./DungGeunMo.woff') format('woff'),
+           url('./DungGeunMo.eot') format('embedded-opentype');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    html, body {
+      margin: 0; padding: 0;
+      background-color: #000;
+      font-family: 'DungGeunMo';
+      overflow: hidden;
+    }
+
+    .card {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      width: 90%; max-width: 400px;
+      text-align: center;
+      z-index: 10;
+      color: black;
+    }
+
+    .mode-select {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 20px;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .mode-select button {
+      width: 48%; padding: 12px; font-size: 16px;
+      background: #00FFDD; border: none; border-radius: 8px;
+      cursor: pointer;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .form-block {
+      display: none; margin-top: 10px;
+    }
+
+    .form-block.active {
+      display: block;
+    }
+
+    input[type="text"] {
+      padding: 12px; width: 100%; font-size: 16px;
+      border-radius: 8px; border: 1px solid #ccc;
+      margin-top: 10px; margin-bottom: 10px;
+      box-sizing: border-box;
+      font-family: 'DungGeunMo'; 
+    }
+
+    button.submit {
+      padding: 12px 20px; font-size: 16px;
+      border: none; background-color: #00FFDD;
+      color: black; border-radius: 8px;
+      cursor: pointer; width: 100%;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .spinner {
+      margin: 10px auto; border: 4px solid #eee;
+      border-top: 4px solid #00FFDD; border-radius: 50%;
+      width: 28px; height: 28px;
+      animation: spin 1s linear infinite; display: none;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .cancel-box {
+      position: absolute; bottom: 30px; left: 50%;
+      transform: translateX(-50%);
+      background: #111; padding: 20px;
+      border-radius: 20px; color: white;
+      width: 90%; max-width: 400px; z-index: 10;
+      box-shadow: 0 0 10px #00FFDD88;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .cancel-box button {
+      background-color: #ccc; color: black;
+      border-radius: 8px;
+      border: none; padding: 10px 16px;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .cancel-input {
+      overflow: hidden; max-height: 0;
+      opacity: 0; transition: all 0.4s ease;
+      font-family: 'DungGeunMo'; 
+    }
+
+    .cancel-input.show {
+      max-height: 120px; opacity: 1; margin-top: 10px;
+      font-family: 'DungGeunMo'; 
+    }
+
+    canvas {
+      position: absolute; top: 0; left: 0;
+    }
+  </style>
+
+  <script>
+    const now = new Date();
+    const deadline = new Date("2025-09-08T12:00:00+09:00");
+
+    if (now >= deadline) {
+      window.addEventListener("DOMContentLoaded", () => {
+        document.body.innerHTML = `
+          <style>
+            body {
+              background: #000; color: #fff;
+              font-family: DungGeunMo;
+              text-align: center; padding: 100px;
+            }
+          </style>
+          <h1>🥲 랜덤런치 신청 마감</h1>
+          <p>신청은 8월 8일 12시에 마감되었습니다.<br>다음 랜덤런치를 기대해주세요!</p>
+        `;
+      });
+    } else {
+      document.addEventListener("DOMContentLoaded", () => {
+        document.body.style.visibility = "visible";
+      });
+    }
+  </script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+</head>
+<body>
+  <canvas></canvas>
+  <div class="card">
+    <h1>🥗 랜덤런치 신청하기</h1>
+    <div class="mode-select">
+      <button onclick="selectMode('solo')">🙋 혼자 신청!</button>
+      <button onclick="selectMode('pair')">👯 같이 신청!</button>
+    </div>
+    <div id="solo-form" class="form-block">
+      <input type="text" id="soloName" placeholder="이름 (예: Isla)" />
+      <button class="submit" onclick="submitSolo()">신청 🍱</button>
+    </div>
+    <div id="pair-form" class="form-block">
+      <input type="text" id="pairName" placeholder="내 이름 (예: Isla)" />
+      <input type="text" id="partnerName" placeholder="같이 신청할 사람 (예: Claire)" />
+      <button class="submit" onclick="submitPair()">같이 신청 👯</button>
+    </div>
+    <div class="spinner" id="loader"></div>
+    <div id="result" style="margin-top: 10px; font-weight: bold;"></div>
+  </div>
+
+  <div class="cancel-box">
+    <p>신청을 취소하고 싶으신가요?</p>
+    <button onclick="toggleCancel()">신청 취소하기 ❌</button>
+    <div class="cancel-input" id="cancelInputWrap">
+      <input type="text" id="cancelName" placeholder="이름 (예: Isla)" />
+      <button onclick="cancelForm()">취소 😢</button>
+    </div>
+    <div id="cancelResult" style="margin-top: 10px; color: #0ff;"></div>
+  </div>
+
+  <script>
+    const GAS_URL = "https://script.google.com/macros/s/AKfycbx1kAB0OZeALCWsYRwDRi0MeQis8vi5bmdeHxeZtSkuEjjIUl5kqnMqtOXLfvPtAsZKMA/exec";
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1X0oWxxP0XuxRnw32x7vfp10U5UuZYj_KHi5rY1xftDk/gviz/tq?tqx=out:csv";
+
+    const { Engine, Render, Runner, World, Bodies, Events } = Matter;
+    const engine = Engine.create();
+    engine.gravity.y = 1;
+    engine.gravity.scale = 0.0005;
+    const world = engine.world;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+    const render = Render.create({
+      element: document.body,
+      engine: engine,
+      options: { width, height, wireframes: false, background: '#000' }
+    });
+    Render.run(render);
+    Runner.run(Runner.create(), engine);
+
+    const formWall = Bodies.rectangle(width / 2, height / 2, 500, 400, { isStatic: true });
+    const ground = Bodies.rectangle(width / 2, height + 25, width, 50, { isStatic: true });
+    const leftWall = Bodies.rectangle(-25, height / 2, 50, height, { isStatic: true });
+    const rightWall = Bodies.rectangle(width + 25, height / 2, 50, height, { isStatic: true });
+    World.add(world, [formWall, ground, leftWall, rightWall]);
+
+    const droppedNames = new Set();
+    const emojis = ["🍣","🍔","🍕","🍙","🌮","🥪","🍱","🍜","🍤","🥟","🧁","🍩"];
+
+    function dropName(text) {
+      if (droppedNames.has(text)) return;
+      droppedNames.add(text);
+      const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+      const label = emoji + " " + text;
+      const x = Math.random() * (width - 200) + 100;
+      const box = Bodies.rectangle(x, -50, 180, 50, {
+        restitution: 0.3,
+        render: { visible: false },
+        label: label
+      });
+      World.add(world, box);
+    }
+
+    Events.on(render, "afterRender", () => {
+      const ctx = render.context;
+      ctx.font = "42px 'DungGeunMo'";
+      ctx.fillStyle = "#ffffff";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      world.bodies.forEach(body => {
+        if (body.label && body.label !== "Rectangle Body") {
+          ctx.fillText(body.label, body.position.x, body.position.y);
+        }
+      });
+    });
+
+    function selectMode(mode) {
+      document.getElementById("solo-form").classList.remove("active");
+      document.getElementById("pair-form").classList.remove("active");
+      document.getElementById("loader").style.display = "none";
+      document.getElementById("result").innerText = "";
+      document.getElementById(mode + "-form").classList.add("active");
+    }
+
+    function submitSolo() {
+      const name = document.getElementById("soloName").value.trim();
+      if (!name) return alert("이름을 입력해주세요!");
+
+      const formData = new FormData();
+      formData.append("names", name);
+
+      document.getElementById("loader").style.display = "block";
+      document.getElementById("result").innerText = "";
+
+      fetch(GAS_URL, { method: "POST", body: formData })
+        .then(res => res.text())
+        .then(text => {
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("result").innerText = text;
+          dropName(name);
+        })
+        .catch(err => {
+          console.error("❌ 요청 실패:", err);
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("result").innerText = "오류 발생 😢 다시 시도해주세요.";
+        });
+    }
+
+    function submitPair() {
+      const name = document.getElementById("pairName").value.trim();
+      const partner = document.getElementById("partnerName").value.trim();
+      if (!name || !partner) {
+        alert("두 분의 이름을 모두 입력해주세요!");
+        return;
+      }
+
+      const group = nextGroupCode(); // 가, 나, 다...
+      const labeledNames = [group + name, group + partner];
+
+      const formData = new FormData();
+      formData.append("names", labeledNames.join(","));
+
+      document.getElementById("loader").style.display = "block";
+      document.getElementById("result").innerText = "";
+
+      fetch(GAS_URL, { method: "POST", body: formData })
+        .then(res => res.text())
+        .then(text => {
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("result").innerText = text;
+          dropName(name);
+          dropName(partner);
+        })
+        .catch(err => {
+          console.error("❌ 요청 실패:", err);
+          document.getElementById("loader").style.display = "none";
+          document.getElementById("result").innerText = "오류 발생 😢 다시 시도해주세요.";
+        });
+    }
+
+    function toggleCancel() {
+      document.getElementById("cancelInputWrap").classList.toggle("show");
+    }
+
+    /* ✅ 수정된 부분: 시트에서 실제 저장된 이름(대소문자/접두어 포함)을 찾아 그대로 전송
+       + 성공 메시지는 접두 한글 제거 후 표준 문구로 표시 */
+    async function cancelForm() {
+      const input = document.getElementById("cancelName").value.trim();
+      if (!input) return alert("이름을 입력해주세요!");
+
+      const normalize = (s) => s.replace(/^[가-힣]/, '').toLowerCase(); // 접두 한글 1글자 제거 + 소문자
+      const target = normalize(input);
+
+      let canonical = null; // 시트에 저장된 원문(예: "Isla" 또는 "갅Isla")
+      try {
+        const res = await fetch(SHEET_CSV_URL);
+        const text = await res.text();
+        const rows = text.trim().split("\n").slice(1);
+        for (const row of rows) {
+          const cols = row.split(",");
+          const val = (cols[1] || "").replace(/^"|"$/g, '').trim(); // B열 이름
+          if (!val) continue;
+          if (normalize(val) === target) { canonical = val; break; }
+        }
+      } catch (e) {
+        console.error("CSV 로드 실패:", e);
+      }
+
+      const nameToSend = canonical || input; // 매칭되면 원문 그대로, 없으면 입력값
+
+      const formData = new FormData();
+      formData.append("name", nameToSend);
+      formData.append("action", "delete");
+
+      fetch(GAS_URL, { method: "POST", body: formData })
+        .then(res => res.text())
+        .then(msg => {
+          // ✅ 화면 표시용 이름: 접두 한글 제거 + 사용자가 입력한 케이스 유지
+          const displayName = input.replace(/^[가-힣]/, '');
+          if (/취소되었습니다/.test(msg)) {
+            document.getElementById("cancelResult").innerText = `${displayName}님의 신청이 취소되었습니다.`;
+          } else {
+            document.getElementById("cancelResult").innerText = msg;
+          }
+
+          // 화면 오브젝트 제거 (입력값 기준)
+          const toRemove = world.bodies.find(
+            b => b.label && b.label.toLowerCase().includes(input.toLowerCase())
+          );
+          if (toRemove) World.remove(world, toRemove);
+          document.getElementById("cancelName").value = "";
+        })
+        .catch(err => {
+          console.error("❌ 요청 실패:", err);
+          document.getElementById("cancelResult").innerText = "취소 실패 😢";
+        });
+    }
+
+    window.onload = async () => {
+      selectMode('solo');
+      const res = await fetch(SHEET_CSV_URL);
+      const text = await res.text();
+      const rows = text.trim().split("\n").slice(1);
+      const names = rows.map(row => row.split(",")[1].replace(/^"|"$/g, '')).filter(Boolean);
+      let i = 0;
+      const interval = setInterval(() => {
+        if (i >= names.length) clearInterval(interval);
+        else dropName(names[i++].replace(/^[가-하]/, ''));
+      }, 600);
+    };
+
+    function nextGroupCode() {
+      const min = '가'.charCodeAt(0);
+      const max = '힣'.charCodeAt(0);
+      let charCode = parseInt(localStorage.getItem("currentGroupCharCode")) || min;
+      const code = String.fromCharCode(charCode);
+      charCode++;
+      if (charCode > max) charCode = min;
+      localStorage.setItem("currentGroupCharCode", charCode);
+      return code;
+    }
+
+    const mouse = Matter.Mouse.create(render.canvas);
+    render.mouse = mouse;
+
+    Events.on(engine, "beforeUpdate", () => {
+      const mousePos = mouse.position;
+      world.bodies.forEach(body => {
+        if (!body.isStatic && body.label && body.label !== "Rectangle Body") {
+          const dx = body.position.x - mousePos.x;
+          const dy = body.position.y - mousePos.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          const effectRadius = 200;
+          const strength = 0.08;
+          if (dist < effectRadius) {
+            const forceMagnitude = (1 - dist / effectRadius) * strength;
+            const fx = (dx / dist) * forceMagnitude;
+            const fy = (dy / dist) * forceMagnitude;
+            Matter.Body.applyForce(body, body.position, { x: fx, y: fy });
+          }
+        }
+      });
+    });
+  </script>
+</body>
+</html>
